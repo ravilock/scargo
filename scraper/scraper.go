@@ -118,27 +118,6 @@ func fetchPage(pageUrl *url.URL) (io.ReadCloser, error) {
 	return response.Body, nil
 }
 
-func scrapePageUrls(node *html.Node) []*url.URL {
-	urls := []*url.URL{}
-	if node.Type == html.ElementNode {
-		for _, a := range node.Attr {
-			if a.Key == "href" {
-				parsedUrl, err := url.Parse(a.Val)
-				if err != nil {
-					break
-				}
-				urls = append(urls, parsedUrl)
-				break
-			}
-		}
-	}
-	for childNode := node.FirstChild; childNode != nil; childNode = childNode.NextSibling {
-		childUrls := scrapePageUrls(childNode)
-		urls = append(urls, childUrls...)
-	}
-	return urls
-}
-
 func addHostNameToUrls(urls []*url.URL, originalUrl *url.URL) {
 	for _, currentUrl := range urls {
 		if currentUrl.Hostname() == "" {
