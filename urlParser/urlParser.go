@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"slices"
 
 	"golang.org/x/net/html"
 )
 
 type UrlParser struct {
+	OriginalURL    *url.URL
 	AllowedDomains []string
 }
 
@@ -17,10 +19,10 @@ func (u *UrlParser) ParseURLs(r io.ReadCloser) ([]*url.URL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse page: %w", err)
 	}
-	return nil, nil
+	return u.scrapePageUrls(node), nil
 }
 
-func scrapePageUrls(node *html.Node) []*url.URL {
+func (u *UrlParser) scrapePageUrls(node *html.Node) []*url.URL {
 	urls := []*url.URL{}
 	if node.Type == html.ElementNode {
 		for _, a := range node.Attr {
@@ -29,14 +31,37 @@ func scrapePageUrls(node *html.Node) []*url.URL {
 				if err != nil {
 					break
 				}
-				urls = append(urls, parsedUrl)
+				parsedUrl = u.addHostNameToUrls(parsedUrl)
+				if u.isAllowedDomain(parsedUrl) {
+					urls = append(urls, parsedUrl)
+				}
 				break
 			}
 		}
 	}
 	for childNode := node.FirstChild; childNode != nil; childNode = childNode.NextSibling {
-		childUrls := scrapePageUrls(childNode)
+		childUrls := u.scrapePageUrls(childNode)
 		urls = append(urls, childUrls...)
 	}
 	return urls
+}
+
+func (u *UrlParser) isAllowedDomain(currentUrl *url.URL) bool {
+	if currentUrl.Scheme != "https" {
+		return false
+	}
+	if currentUrl.Hostname() != "" && slices.Contains(u.AllowedDomains, currentUrl.Hostname()) {
+		return true
+	}
+	return false
+}
+
+func (u *UrlParser) addHostNameToUrls(currentUrl *url.URL) *url.URL {
+	if currentUrl.Hostname() == "" {
+		currentUrl.Host = u.OriginalURL.Host
+	}
+	if currentUrl.Scheme == "" {
+		currentUrl.Scheme = u.OriginalURL.Scheme
+	}
+	return currentUrl
 }
