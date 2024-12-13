@@ -1,8 +1,10 @@
 package scrape
 
 import (
+	"fmt"
 	"log"
 	"net/url"
+	"runtime"
 
 	"github.com/ravilock/scargo/cmd/exit"
 	"github.com/ravilock/scargo/scraper"
@@ -10,8 +12,9 @@ import (
 )
 
 var (
-	depth             int
-	domainRestriction int8
+	depth              int
+	domainRestriction  int8
+	numberOfGoroutines int
 )
 
 func init() {
@@ -19,6 +22,7 @@ func init() {
 
 	flags.IntVarP(&depth, "depth", "d", 5, "Define sub-page depth limit to scrape pages. Set to 0 for no limit.")
 	flags.Int8Var(&domainRestriction, "domain-restriction", 0, "Define the domain restriction imposed on the Scrape function.")
+	flags.IntVar(&numberOfGoroutines, "worker-pool-size", runtime.NumCPU(), "Define the worker pool size that is going to be used on the Scraper.")
 }
 
 var ScrapeCmd = &cobra.Command{
@@ -35,11 +39,11 @@ func scrape(cmd *cobra.Command, args []string) {
 		log.Println("Failed to parse URL", err)
 		panic(&exit.PanicError{Code: 1})
 	}
-	if err := scraper.Scrape(parsedUrl, &scraper.ScrapeOptions{
+	webScraper := scraper.NewScraper(&scraper.ScrapeOptions{
 		DepthLimit:        depth,
+		WorkerPoolSize:    numberOfGoroutines,
 		DomainRestriction: scraper.DomainRestriction(domainRestriction),
-	}); err != nil {
-		log.Println("Failed to scrape", err)
-		panic(&exit.PanicError{Code: 1})
-	}
+	})
+	webScraper.Start(parsedUrl)
+	fmt.Println("end")
 }
